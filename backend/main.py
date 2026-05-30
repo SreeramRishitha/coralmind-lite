@@ -124,8 +124,9 @@ def get_queries(question: str, owner: str, repo: str):
                 username = q.split(keyword)[-1].strip().strip("@").strip()
                 break
         return [
-            f"SELECT number, title, state, user__login FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND user__login = '{username}' LIMIT 10",
-            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
+            f"SELECT number, title, state, user__login, created_at, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 100",
+            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5",
+            username
         ]
 
     elif any(w in q for w in ["merged", "closed", "done", "completed", "shipped"]):
@@ -238,6 +239,10 @@ async def ask(data: QuestionRequest):
     raw2 = run_coral(queries[1])
 
     data1 = parse_coral_output(raw1)
+    # Filter by username in Python since Coral can't filter nested fields
+    if len(queries) > 2 and queries[2]:
+        username = queries[2]
+        data1 = [r for r in data1 if r.get("user__login", "").lower() == username.lower()]
     data2 = parse_coral_output(raw2)
     # Generate deployments from merged PRs
     merged_prs = [r for r in data1 if r.get("merged_at")]
