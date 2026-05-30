@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root {
+  --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
+  --accent: #7c6af7; --accent-dim: #4a3f9f;
+  --text: #e2e2f0; --text-muted: #6b6b8a;
+  --green: #4ade80; --yellow: #fbbf24;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

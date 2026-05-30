@@ -1,0 +1,9 @@
+node_modules
+frontend/node_modules
+backend/__pycache__
+backend/incidents.db
+backend/.env
+backend/coral
+backend/coral-linux.tar.gz
+backend/get-docker.sh"node_modules/" 
+"frontend/node_modules/" 

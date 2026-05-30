@@ -1,0 +1,5 @@
+{"id": "INC-001", "issue_number": 907, "service": "catalog", "description": "Search results returning irrelevant sources", "severity": "high", "reported_at": "2026-05-27T20:00:00Z", "status": "open"}
+{"id": "INC-002", "issue_number": 871, "service": "mcp", "description": "MCP transport failing for some clients", "severity": "high", "reported_at": "2026-05-27T18:00:00Z", "status": "open"}
+{"id": "INC-003", "issue_number": 913, "service": "catalog", "description": "Catalog metadata snapshots not caching correctly", "severity": "medium", "reported_at": "2026-05-27T10:00:00Z", "status": "investigating"}
+{"id": "INC-004", "issue_number": 901, "service": "mcp", "description": "Catalog discovery output too verbose", "severity": "low", "reported_at": "2026-05-26T14:00:00Z", "status": "resolved"}
+{"id": "INC-005", "issue_number": 792, "service": "search", "description": "Universal search returning stale metadata", "severity": "high", "reported_at": "2026-05-25T09:00:00Z", "status": "open"}
