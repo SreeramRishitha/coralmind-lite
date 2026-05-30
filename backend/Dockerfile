@@ -8,7 +8,5 @@ RUN apt-get update && apt-get install -y curl tar && \
     chmod +x coral && \
     rm coral.tar.gz
 COPY . .
-RUN mkdir -p /root/.config/withcoral/coral/config && \
-    cp coral-config.toml /root/.config/withcoral/coral/config/config.toml
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "/app/coral source add github && /app/coral source add sentry && uvicorn main:app --host 0.0.0.0 --port 8000"]
