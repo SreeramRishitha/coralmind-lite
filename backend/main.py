@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import subprocess
 import time
+import json
 from groq import Groq
 import os
 from dotenv import load_dotenv
@@ -36,6 +37,11 @@ INCIDENT_KEYWORDS = ["bug", "fail", "failure", "error", "timeout", "crash", "bro
 
 class QuestionRequest(BaseModel):
     question: str
+    owner: str = "withcoral"
+    repo: str = "coral"
+
+class PRRequest(BaseModel):
+    number: int
     owner: str = "withcoral"
     repo: str = "coral"
 
@@ -82,12 +88,10 @@ def generate_dynamic_incidents(issues: list):
                 severity = "medium"
             else:
                 severity = "low"
-
             try:
                 service = title.split("(")[1].split(")")[0] if "(" in title else "general"
             except:
                 service = "general"
-
             incidents.append({
                 "id": f"DYN-{idx+1:03}",
                 "issue_number": str(issue.get("number", "")),
@@ -98,6 +102,7 @@ def generate_dynamic_incidents(issues: list):
                 "status": "investigating"
             })
     return incidents[:5]
+
 def get_sentry_incidents():
     query = "SELECT id, title, status, level FROM sentry.issues LIMIT 7"
     raw = run_coral(query)
@@ -114,92 +119,39 @@ def get_sentry_incidents():
             "status": row.get("status", "unresolved")
         })
     return incidents
-def get_queries(question: str, owner: str, repo: str):
-    q = question.lower()
 
-    # MUST be first — contains "pr" which matches later branch
-    if "prs by " in q or "pulls by " in q or "raised by " in q:
-        for keyword in ["prs by ", "pulls by ", "raised by "]:
-            if keyword in q:
-                username = q.split(keyword)[-1].strip().strip("@").strip()
-                break
-        return [
-            f"SELECT number, title, state, user__login, created_at, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 1000",
-            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5",
-            username
-        ]
+def is_technical_question(question: str) -> bool:
+    non_technical = [
+        "hi", "hii", "hello", "hey", "howdy", "sup", "what's up", "whats up",
+        "how are you", "who are you", "what are you", "what is coral",
+        "good morning", "good evening", "good night", "thanks", "thank you",
+        "ok", "okay", "cool", "nice", "bye", "goodbye"
+    ]
+    if question.lower().strip() in non_technical:
+        return False
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        check = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": f'Is this question about software engineering, GitHub, code, repositories, commits, PRs, issues, incidents, or deployments? Answer only YES or NO.\nQuestion: "{question}"'}],
+            max_tokens=5
+        )
+        return "YES" in check.choices[0].message.content.upper()
+    except:
+        return True
 
-    elif any(w in q for w in ["merged", "closed", "done", "completed", "shipped"]):
-        return [
-            f"SELECT number, title, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 10",
-            f"SELECT i.number, i.title, i.state, p.merged_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 5"
-        ]
-
-    elif any(w in q for w in ["deploy", "deployment", "release", "released"]):
-        return [
-            f"SELECT number, title, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 10",
-            f"SELECT i.number, i.title, i.state FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 5"
-        ]
-
-    elif any(w in q for w in ["contributor", "who", "author", "top", "most active", "active", "people", "team", "works"]):
-        return [
-            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
-            f"SELECT number, title, state FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
-        ]
-
-    elif any(w in q for w in ["incident", "outage", "down", "service", "production", "alert", "severity"]):
-        return [
-            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
-            f"SELECT i.number, i.title, p.merged_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 5"
-        ]
-
-    elif any(w in q for w in ["bug", "fix", "error", "broken", "fail", "crash", "problem"]):
-        return [
-            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
-            f"SELECT i.number, i.title, i.state, p.created_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 5"
-        ]
-
-    elif any(w in q for w in ["pr", "pull request", "pull", "review"]):
-        return [
-            f"SELECT number, title, state, created_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
-            f"SELECT i.number, i.title, i.state, p.created_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 5"
-        ]
-
-    elif any(w in q for w in ["feature", "new", "add", "added", "built", "implement"]):
-        return [
-            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
-            f"SELECT number, title, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 5"
-        ]
-
-    else:
-        return [
-            f"SELECT i.number, i.title, i.state, p.created_at, p.merged_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 10",
-            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
-        ]
-def generate_summary(question: str, github_data: list, supporting_data: list, incidents: list):
-    context = f"""You are an engineering intelligence assistant analyzing GitHub activity and operational incidents.
-
-Answer this question directly: {question}
-
-Primary data: {github_data}
-Supporting data: {supporting_data}
-Incident data: {incidents}
-
-Rules:
-- Be concise and specific, 2-3 sentences max
-- Mention actual names, issue numbers, PR titles, and incident IDs when present
-- Never say "the data does not provide" — summarize the closest relevant findings instead
-- Write like an internal engineering insights tool, not a chatbot"""
+def answer_non_technical(question: str) -> str:
     try:
         client = Groq(api_key=GROQ_API_KEY)
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": context}],
-            max_tokens=250
+            messages=[{"role": "user", "content": f'You are CoralMind, an AI engineering assistant that helps developers understand their GitHub repositories. Answer this conversationally and briefly: "{question}"'}],
+            max_tokens=150
         )
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Summary unavailable: {str(e)}"
+    except:
+        return "Hi! I'm CoralMind, your AI engineering assistant. Ask me about your repository — try 'show incidents', 'who are the top contributors', or 'explain #990'."
+
 def generate_sql_from_question(question: str, owner: str, repo: str):
     prompt = f"""You are a SQL expert for Coral, a SQL runtime that queries GitHub and other sources.
 
@@ -230,34 +182,54 @@ Rules:
             max_tokens=300
         )
         text = response.choices[0].message.content.strip()
-        # Clean up markdown if present
         text = text.replace("```json", "").replace("```", "").strip()
-        import json
         parsed = json.loads(text)
         return [parsed.get("query1", ""), parsed.get("query2", "")]
     except Exception as e:
-        # Fallback to default queries
         return [
             f"SELECT i.number, i.title, i.state, p.created_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 10",
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
 
+def generate_summary(question: str, github_data: list, supporting_data: list, incidents: list):
+    context = f"""You are an engineering intelligence assistant analyzing GitHub activity and operational incidents.
+
+Answer this question directly: {question}
+
+Primary data: {github_data}
+Supporting data: {supporting_data}
+Incident data: {incidents}
+
+Rules:
+- Be concise and specific, 2-3 sentences max
+- Mention actual names, issue numbers, PR titles, and incident IDs when present
+- Never say "the data does not provide" — summarize the closest relevant findings instead
+- If asked about commits, use the contributions column from repo_contributors as the commit count
+- Write like an internal engineering insights tool, not a chatbot"""
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": context}],
+            max_tokens=250
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Summary unavailable: {str(e)}"
+
 @app.get("/")
 def home():
     return {"status": "CoralMind Lite is running"}
+
 @app.get("/debug-coral")
 def debug_coral():
-    import os
     coral_path = os.getenv("CORAL_PATH", "/app/coral")
-    # Check if file exists
     exists = os.path.exists(coral_path)
-    # Check config location
     config_paths = [
         "/root/.local/share/withcoral/coral/config/config.toml",
         "/root/.config/withcoral/coral/config/config.toml",
     ]
     config_found = {p: os.path.exists(p) for p in config_paths}
-    # Run coral
     raw = run_coral("SELECT login, contributions FROM github.repo_contributors WHERE owner = 'withcoral' AND repo = 'coral' LIMIT 5")
     return {
         "coral_path": coral_path,
@@ -266,27 +238,20 @@ def debug_coral():
         "raw_output": raw,
         "github_token_set": bool(os.getenv("GITHUB_TOKEN")),
     }
+
 @app.get("/debug-pulls")
 def debug_pulls():
     raw = run_coral("SELECT * FROM github.pulls WHERE owner = 'sugarlabs' AND repo = 'musicblocks' LIMIT 1")
     return {"raw": raw}
-class PRRequest(BaseModel):
-    number: int
-    owner: str = "withcoral"
-    repo: str = "coral"
 
 @app.post("/explain-pr")
 async def explain_pr(data: PRRequest):
     query = f"SELECT number, title, body, state, user__login FROM github.pulls WHERE owner = '{data.owner}' AND repo = '{data.repo}' AND number = {data.number} LIMIT 1"
     raw = run_coral(query)
-    
-    # Don't use parse_coral_output — body field breaks table parsing
-    # Extract fields directly from raw output
     title = ""
     state = ""
     author = ""
     body = ""
-    
     for line in raw.split("\n"):
         line = line.strip()
         if line.startswith("|") and "---" not in line and "number" not in line.lower()[:20]:
@@ -297,14 +262,11 @@ async def explain_pr(data: PRRequest):
                 state = parts[3]
                 author = parts[4] if len(parts) > 4 else ""
                 break
-    
     if not title:
-        # fallback: just send raw to AI
         body_text = raw
         title = f"PR #{data.number}"
     else:
         body_text = body
-
     context = f"""Explain this GitHub pull request clearly for an engineer.
 
 Title: {title}
@@ -313,7 +275,6 @@ State: {state}
 Body: {body_text}
 
 Give a 3-4 sentence explanation: what problem it solves, what changed, and why it matters."""
-
     try:
         client = Groq(api_key=GROQ_API_KEY)
         response = client.chat.completions.create(
@@ -324,25 +285,40 @@ Give a 3-4 sentence explanation: what problem it solves, what changed, and why i
         return {"explanation": response.choices[0].message.content, "pr": {"number": data.number, "title": title}}
     except Exception as e:
         return {"explanation": f"Unavailable: {str(e)}", "pr": None}
+
 @app.post("/ask")
 async def ask(data: QuestionRequest):
-    queries = generate_sql_from_question(data.question, data.owner, data.repo)
     q = data.question.lower()
+
+    # Handle non-technical questions
+    if not is_technical_question(data.question):
+        return {
+            "question": data.question,
+            "owner": data.owner,
+            "repo": data.repo,
+            "summary": answer_non_technical(data.question),
+            "sources_used": [],
+            "sql_queries": [],
+            "correlated_data": [],
+            "open_issues": [],
+            "incidents": [],
+            "deployments": [],
+        }
+
+    queries = generate_sql_from_question(data.question, data.owner, data.repo)
 
     raw1 = run_coral(queries[0])
     raw2 = run_coral(queries[1])
 
     data1 = parse_coral_output(raw1)
-    # Filter by username in Python since Coral can't filter nested fields
     if len(queries) > 2 and queries[2]:
         username = queries[2]
         data1 = [r for r in data1 if r.get("user__login", "").lower() == username.lower()]
     data2 = parse_coral_output(raw2)
-    # Generate deployments from merged PRs
+
     merged_prs = [r for r in data1 if r.get("merged_at")]
     deployments = generate_deployments_from_prs(merged_prs)
 
-    # Generate dynamic incidents from repo activity
     dynamic = generate_dynamic_incidents(data1)
 
     if any(w in q for w in ["incident", "outage", "down", "service", "alert", "severity", "sentry", "production"]):
@@ -351,22 +327,30 @@ async def ask(data: QuestionRequest):
         dynamic = generate_dynamic_incidents(data1)
         incidents = (sentry + static + dynamic)[:7]
     else:
-        issue_numbers = [int(r["number"]) for r in data1 if r.get("number") and str(r.get("number","")).isdigit()]
+        issue_numbers = [int(r["number"]) for r in data1 if r.get("number") and str(r.get("number", "")).isdigit()]
         static = get_incidents_for_issues(issue_numbers)
         dynamic = generate_dynamic_incidents(data1)
         incidents = (static + dynamic)[:5]
 
     summary = generate_summary(data.question, data1, data2, incidents)
 
+    active_sources = []
+    if data1 or data2:
+        active_sources = ["github.issues", "github.pulls"]
+    if incidents:
+        active_sources += ["sentry.issues", "operational.insights"]
+    if deployments:
+        active_sources.append("deployments")
+
     return {
         "question": data.question,
         "owner": data.owner,
         "repo": data.repo,
         "summary": summary,
-        "sources_used": ["github.issues", "github.pulls", "sentry.issues", "operational.insights","deployments"],
+        "sources_used": active_sources,
         "sql_queries": queries,
         "correlated_data": data1,
         "open_issues": data2,
         "incidents": incidents,
-        "deployments":deployments,
+        "deployments": deployments,
     }
