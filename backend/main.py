@@ -200,6 +200,47 @@ Rules:
         return response.choices[0].message.content
     except Exception as e:
         return f"Summary unavailable: {str(e)}"
+def generate_sql_from_question(question: str, owner: str, repo: str):
+    prompt = f"""You are a SQL expert for Coral, a SQL runtime that queries GitHub and other sources.
+
+Generate exactly 2 SQL queries to answer this question: "{question}"
+
+Available tables:
+- github.issues: number, title, state, created_at, closed_at (filter: owner='{owner}', repo='{repo}')
+- github.pulls: number, title, state, created_at, merged_at, user__login (filter: owner='{owner}', repo='{repo}')
+- github.repo_contributors: login, contributions (filter: owner='{owner}', repo='{repo}')
+- sentry.issues: id, title, status, level
+
+Rules:
+- Always include WHERE owner='{owner}' AND repo='{repo}' for github tables
+- Use LIMIT 10 on first query, LIMIT 5 on second
+- For commits/commit count questions: use github.repo_contributors and sum contributions
+- For PR questions: use github.pulls
+- For issue questions: use github.issues
+- For contributor questions: use github.repo_contributors
+- For incident questions: use sentry.issues (no owner/repo filter needed)
+- Return ONLY a JSON object like: {{"query1": "SELECT ...", "query2": "SELECT ..."}}
+- No explanation, no markdown, just the JSON"""
+
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300
+        )
+        text = response.choices[0].message.content.strip()
+        # Clean up markdown if present
+        text = text.replace("```json", "").replace("```", "").strip()
+        import json
+        parsed = json.loads(text)
+        return [parsed.get("query1", ""), parsed.get("query2", "")]
+    except Exception as e:
+        # Fallback to default queries
+        return [
+            f"SELECT i.number, i.title, i.state, p.created_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 10",
+            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
+        ]
 
 @app.get("/")
 def home():
@@ -285,7 +326,7 @@ Give a 3-4 sentence explanation: what problem it solves, what changed, and why i
         return {"explanation": f"Unavailable: {str(e)}", "pr": None}
 @app.post("/ask")
 async def ask(data: QuestionRequest):
-    queries = get_queries(data.question, data.owner, data.repo)
+    queries = generate_sql_from_question(data.question, data.owner, data.repo)
     q = data.question.lower()
 
     raw1 = run_coral(queries[0])
