@@ -21,6 +21,8 @@ export default function Home() {
   const [lineIndex, setLineIndex] = useState(0)
   const [displayed, setDisplayed] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [prExplain, setPrExplain] = useState(null)
+  const [prLoading, setPrLoading] = useState(false)
 
   useEffect(() => {
     const current = lines[lineIndex]
@@ -62,6 +64,22 @@ export default function Home() {
     }
     setLoading(false)
     setLoadingStep("")
+  }
+   async function explainPR(number) {
+    setPrLoading(true)
+    setPrExplain({ number, explanation: null })
+    try {
+      const r = await fetch("https://coralmind-lite-backend.onrender.com/explain-pr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: parseInt(number), owner, repo })
+      })
+      const data = await r.json()
+      setPrExplain({ number, explanation: data.explanation })
+    } catch {
+      setPrExplain({ number, explanation: "Could not fetch explanation." })
+    }
+    setPrLoading(false)
   }
 
   const badge = s => {
@@ -416,7 +434,12 @@ export default function Home() {
                   {res.correlated_data.map((row, i) => (
                     <div key={i} style={{ ...brow, borderBottom: i === res.correlated_data.length - 1 ? "none" : "1px solid #16161f" }}>
                       <span style={dot(row.state === "open" ? "#34d399" : "#a78bfa")} />
-                      <span style={{ fontFamily: "monospace", fontSize: 11, minWidth: 34, color: "#34d399" }}>#{row.number}</span>
+                      <span
+                        onClick={() => explainPR(row.number)}
+                        style={{ fontFamily: "monospace", fontSize: 11, minWidth: 34, color: "#34d399", cursor: "pointer", textDecoration: "underline" }}
+                      >
+                        #{row.number}
+                      </span>
                       <span style={{ flex: 1, color: "#7070a0" }}>{row.title}</span>
                       {row.state && <span style={badge(row.state)}>{row.state}</span>}
                       {row.merged_at && <span style={badge("merged")}>merged</span>}
@@ -447,6 +470,22 @@ export default function Home() {
                   </div>
                 </div>
               )}
+              {/* PR Explanation */}
+              {prExplain && (
+                <div style={{ ...block, border: "1px solid rgba(124,58,237,.3)" }}>
+                  <div style={{ ...bhead("#a78bfa"), justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <span style={dot("#a78bfa")} />
+                      PR #{prExplain.number} — AI EXPLANATION
+                    </div>
+                    <span onClick={() => setPrExplain(null)} style={{ cursor: "pointer", color: "#3a3a5a", fontSize: 16 }}>✕</span>
+                  </div>
+                  <p style={{ padding: "12px 14px", fontSize: 13, color: "#9090c0", lineHeight: 1.85, margin: 0 }}>
+                    {prLoading ? "Analyzing PR..." : prExplain.explanation}
+                  </p>
+                </div>
+              )}
+
 
               {/* SQL Queries */}
               {res.sql_queries?.length > 0 && (

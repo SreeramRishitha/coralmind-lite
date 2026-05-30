@@ -229,6 +229,37 @@ def debug_coral():
 def debug_pulls():
     raw = run_coral("SELECT * FROM github.pulls WHERE owner = 'sugarlabs' AND repo = 'musicblocks' LIMIT 1")
     return {"raw": raw}
+class PRRequest(BaseModel):
+    number: int
+    owner: str = "withcoral"
+    repo: str = "coral"
+
+@app.post("/explain-pr")
+async def explain_pr(data: PRRequest):
+    query = f"SELECT number, title, body, state, user__login FROM github.pulls WHERE owner = '{data.owner}' AND repo = '{data.repo}' AND number = {data.number} LIMIT 1"
+    raw = run_coral(query)
+    rows = parse_coral_output(raw)
+    if not rows:
+        return {"explanation": "PR not found.", "pr": None}
+    pr = rows[0]
+    context = f"""Explain this GitHub pull request clearly for an engineer.
+
+Title: {pr.get('title')}
+Author: {pr.get('user__login')}
+State: {pr.get('state')}
+Body: {pr.get('body', 'No description')}
+
+Give a 3-4 sentence explanation: what problem it solves, what changed, and why it matters."""
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": context}],
+            max_tokens=250
+        )
+        return {"explanation": response.choices[0].message.content, "pr": pr}
+    except Exception as e:
+        return {"explanation": f"Unavailable: {str(e)}", "pr": pr}
 
 @app.post("/ask")
 async def ask(data: QuestionRequest):
