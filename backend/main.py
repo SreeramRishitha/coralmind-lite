@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-CORAL_PATH = "D:\Coral\coral.exe"
+CORAL_PATH = os.getenv("CORAL_PATH", "/app/coral")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 cache = {}
