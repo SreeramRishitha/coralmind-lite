@@ -224,6 +224,11 @@ def debug_coral():
         "raw_output": raw,
         "github_token_set": bool(os.getenv("GITHUB_TOKEN")),
     }
+@app.get("/debug-pulls")
+def debug_pulls():
+    raw = run_coral("SELECT * FROM github.pulls WHERE owner = 'sugarlabs' AND repo = 'musicblocks' LIMIT 1")
+    return {"raw": raw}
+
 @app.post("/ask")
 async def ask(data: QuestionRequest):
     queries = get_queries(data.question, data.owner, data.repo)
