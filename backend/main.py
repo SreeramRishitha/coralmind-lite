@@ -238,18 +238,41 @@ class PRRequest(BaseModel):
 async def explain_pr(data: PRRequest):
     query = f"SELECT number, title, body, state, user__login FROM github.pulls WHERE owner = '{data.owner}' AND repo = '{data.repo}' AND number = {data.number} LIMIT 1"
     raw = run_coral(query)
-    rows = parse_coral_output(raw)
-    if not rows:
-        return {"explanation": "PR not found.", "pr": None}
-    pr = rows[0]
+    
+    # Don't use parse_coral_output — body field breaks table parsing
+    # Extract fields directly from raw output
+    title = ""
+    state = ""
+    author = ""
+    body = ""
+    
+    for line in raw.split("\n"):
+        line = line.strip()
+        if line.startswith("|") and "---" not in line and "number" not in line.lower()[:20]:
+            parts = [p.strip() for p in line.split("|")[1:-1]]
+            if len(parts) >= 4 and parts[0].isdigit():
+                title = parts[1]
+                body = parts[2]
+                state = parts[3]
+                author = parts[4] if len(parts) > 4 else ""
+                break
+    
+    if not title:
+        # fallback: just send raw to AI
+        body_text = raw
+        title = f"PR #{data.number}"
+    else:
+        body_text = body
+
     context = f"""Explain this GitHub pull request clearly for an engineer.
 
-Title: {pr.get('title')}
-Author: {pr.get('user__login')}
-State: {pr.get('state')}
-Body: {pr.get('body', 'No description')}
+Title: {title}
+Author: {author}
+State: {state}
+Body: {body_text}
 
 Give a 3-4 sentence explanation: what problem it solves, what changed, and why it matters."""
+
     try:
         client = Groq(api_key=GROQ_API_KEY)
         response = client.chat.completions.create(
@@ -257,10 +280,9 @@ Give a 3-4 sentence explanation: what problem it solves, what changed, and why i
             messages=[{"role": "user", "content": context}],
             max_tokens=250
         )
-        return {"explanation": response.choices[0].message.content, "pr": pr}
+        return {"explanation": response.choices[0].message.content, "pr": {"number": data.number, "title": title}}
     except Exception as e:
-        return {"explanation": f"Unavailable: {str(e)}", "pr": pr}
-
+        return {"explanation": f"Unavailable: {str(e)}", "pr": None}
 @app.post("/ask")
 async def ask(data: QuestionRequest):
     queries = get_queries(data.question, data.owner, data.repo)

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 
-const CHIPS = ['show merged PRs', 'open issues', 'what is being worked on', 'who are the top contributors', 'show incidents']
+const CHIPS = ['show merged PRs', 'open issues', 'what is being worked on', 'who are the top contributors', 'explain #990']
 
 export default function Home() {
   const [started, setStarted] = useState(false)
@@ -45,6 +45,16 @@ export default function Home() {
 
   async function ask(query) {
     const question = query || q
+    if (!question.trim()) return
+
+    // Handle "explain #NUMBER" or "explain pr NUMBER"
+    const explainMatch = question.match(/explain\s+#?(\d+)/i)
+    if (explainMatch) {
+      const prNumber = parseInt(explainMatch[1])
+      setQ("")
+      await explainPR(prNumber)
+      return
+    }
     if (!question.trim()) return
     setQ(question)
     setLoading(true)
@@ -336,10 +346,22 @@ export default function Home() {
               )}
 
               {/* AI Summary */}
-              {res.summary && (
+              {(res.summary || prExplain) && (
                 <div style={block}>
-                  <div style={bhead("#a78bfa")}><span style={dot("#a78bfa")} />AI SUMMARY</div>
-                  <p style={{ padding: "12px 14px", fontSize: 13, color: "#9090c0", lineHeight: 1.85, margin: 0 }}>{res.summary}</p>
+                  <div style={{ ...bhead("#a78bfa"), justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <span style={dot("#a78bfa")} />
+                      {prExplain ? `PR #${prExplain.number} — AI EXPLANATION` : "AI SUMMARY"}
+                    </div>
+                    {prExplain && (
+                      <span onClick={() => setPrExplain(null)} style={{ cursor: "pointer", color: "#555", fontSize: 14 }}>✕</span>
+                    )}
+                  </div>
+                  <p style={{ padding: "12px 14px", fontSize: 13, color: "#9090c0", lineHeight: 1.85, margin: 0 }}>
+                    {prExplain
+                      ? (prLoading ? "Analyzing PR..." : prExplain.explanation)
+                      : res.summary}
+                  </p>
                 </div>
               )}
 
@@ -470,22 +492,6 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {/* PR Explanation */}
-              {prExplain && (
-                <div style={{ ...block, border: "1px solid rgba(124,58,237,.3)" }}>
-                  <div style={{ ...bhead("#a78bfa"), justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={dot("#a78bfa")} />
-                      PR #{prExplain.number} — AI EXPLANATION
-                    </div>
-                    <span onClick={() => setPrExplain(null)} style={{ cursor: "pointer", color: "#3a3a5a", fontSize: 16 }}>✕</span>
-                  </div>
-                  <p style={{ padding: "12px 14px", fontSize: 13, color: "#9090c0", lineHeight: 1.85, margin: 0 }}>
-                    {prLoading ? "Analyzing PR..." : prExplain.explanation}
-                  </p>
-                </div>
-              )}
-
 
               {/* SQL Queries */}
               {res.sql_queries?.length > 0 && (
