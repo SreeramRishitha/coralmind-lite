@@ -203,7 +203,27 @@ Rules:
 @app.get("/")
 def home():
     return {"status": "CoralMind Lite is running"}
-
+@app.get("/debug-coral")
+def debug_coral():
+    import os
+    coral_path = os.getenv("CORAL_PATH", "/app/coral")
+    # Check if file exists
+    exists = os.path.exists(coral_path)
+    # Check config location
+    config_paths = [
+        "/root/.local/share/withcoral/coral/config/config.toml",
+        "/root/.config/withcoral/coral/config/config.toml",
+    ]
+    config_found = {p: os.path.exists(p) for p in config_paths}
+    # Run coral
+    raw = run_coral("SELECT login, contributions FROM github.repo_contributors WHERE owner = 'withcoral' AND repo = 'coral' LIMIT 5")
+    return {
+        "coral_path": coral_path,
+        "coral_exists": exists,
+        "config_found": config_found,
+        "raw_output": raw,
+        "github_token_set": bool(os.getenv("GITHUB_TOKEN")),
+    }
 @app.post("/ask")
 async def ask(data: QuestionRequest):
     queries = get_queries(data.question, data.owner, data.repo)
