@@ -49,7 +49,7 @@ export default function Home() {
     setRes(null)
     setLoadingStep("Querying Coral SQL...")
     try {
-      const r = await fetch("http://localhost:8000/ask", {
+      const r = await fetch("https://coralmind-lite-backend.onrender.com/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, owner, repo })
