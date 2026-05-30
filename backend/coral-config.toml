@@ -1,0 +1,11 @@
+version = 1
+[workspaces.default.sources.github]
+variables = { GITHUB_API_BASE = "https://api.github.com" }
+secrets = ["GITHUB_TOKEN"]
+credential_storage = "env"
+origin = "bundled"
+[workspaces.default.sources.sentry]
+variables = { SENTRY_ORG = "rguktrk-valley" }
+secrets = ["SENTRY_TOKEN"]
+credential_storage = "env"
+origin = "bundled"
