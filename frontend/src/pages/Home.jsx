@@ -386,8 +386,8 @@ export default function Home() {
               {res.correlated_data?.length > 0 && res.correlated_data[0]?.login && (
                 <div style={{ ...block, borderLeft: "2px solid #60a0f0" }}>
                   <div style={bhead("#60a0f0")}><span style={dot("#60a0f0")} />TOP CONTRIBUTORS</div>
-                  {res.correlated_data.filter(row => row.number && row.title).map((row, i, arr) => (
-                    <div key={i} style={{ ...brow, justifyContent: "space-between", borderBottom: i === res.correlated_data.length - 1 ? "none" : "1px solid #16161f" }}>
+                  {res.correlated_data.filter(row => row.login).map((row, i, arr) => (
+                    <div key={i} style={{ ...brow, justifyContent: "space-between", borderBottom: i === arr.length - 1 ? "none" : "1px solid #16161f" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div style={{
                           width: 24, height: 24, borderRadius: "50%",
@@ -422,7 +422,7 @@ export default function Home() {
                 <div style={{ ...block, borderLeft: "2px solid #34d399" }}>
                   <div style={bhead("#34d399")}><span style={dot("#34d399")} />GITHUB DATA</div>
                   {res.correlated_data.filter(row => row.number && row.title).map((row, i, arr) => (
-                    <div key={i} style={{ ...brow, borderBottom: i === res.correlated_data.length - 1 ? "none" : "1px solid #16161f" }}>
+                    <div key={i} style={{ ...brow, borderBottom: i === arr.length - 1 ? "none" : "1px solid #16161f" }}>
                       <span style={dot(row.state === "open" ? "#34d399" : "#a78bfa")} />
                       <span
                         onClick={() => explainPR(row.number)}
