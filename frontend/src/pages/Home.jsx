@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 
-const CHIPS = ['show merged PRs', 'open issues', 'what is being worked on', 'who are the top contributors', 'explain #990']
+const CHIPS = ['show merged PRs', 'open issues', 'what is being worked on', 'who are the top contributors', 'explain #990','show incidents']
 
 export default function Home() {
   const [started, setStarted] = useState(false)
@@ -46,8 +46,6 @@ export default function Home() {
   async function ask(query) {
     const question = query || q
     if (!question.trim()) return
-
-    // Handle "explain #NUMBER" or "explain pr NUMBER"
     const explainMatch = question.match(/explain\s+#?(\d+)/i)
     if (explainMatch) {
       const prNumber = parseInt(explainMatch[1])
@@ -75,7 +73,8 @@ export default function Home() {
     setLoading(false)
     setLoadingStep("")
   }
-   async function explainPR(number) {
+
+  async function explainPR(number) {
     setPrLoading(true)
     setPrExplain({ number, explanation: null })
     try {
@@ -105,7 +104,6 @@ export default function Home() {
   const block = { background: "#0d0d14", border: "1px solid #1a1a2a", borderRadius: 10, overflow: "hidden", marginBottom: 0 }
   const bhead = color => ({ padding: "9px 14px", borderBottom: "1px solid #16161f", display: "flex", alignItems: "center", gap: 7, fontSize: 11, fontFamily: "monospace", letterSpacing: ".08em", fontWeight: 500, color })
   const dot = bg => ({ width: 7, height: 7, borderRadius: "50%", background: bg, flexShrink: 0 })
-  // CHANGE 5 — brow: added transition and slightly updated padding/border color
   const brow = { display: "flex", alignItems: "center", gap: 9, padding: "9px 16px", borderBottom: "1px solid #0f0f0f", fontSize: 12, cursor: "default", transition: "background .1s" }
 
   const githubCount = res?.correlated_data?.length || 0
@@ -121,7 +119,6 @@ export default function Home() {
       overflow: "hidden",
       position: "relative"
     }}>
-      {/* Background glow */}
       <div style={{
         position: "absolute",
         top: -300,
@@ -134,7 +131,6 @@ export default function Home() {
         filter: "blur(140px)"
       }} />
 
-      {/* Top nav */}
       <div style={{
         position: "relative",
         zIndex: 2,
@@ -144,13 +140,13 @@ export default function Home() {
         alignItems: "center"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-  <img
-    src="/coralmind_full_logo.png"
-    alt="CoralMind"
-    style={{ height: 36, width: 36, objectFit: "contain" }}
-  />
-  <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.04em" }}>CoralMind</span>
-</div>
+          <img
+            src="https://res.cloudinary.com/dnrnhtkyq/image/upload/v1780174379/WhatsApp_Image_2026-05-31_at_2.15.45_AM_van54k.jpg"
+            alt="CoralMind"
+            style={{ height: 36, width: 36, borderRadius: 8, objectFit: "contain" }}
+          />
+          <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.04em" }}>CoralMind</span>
+        </div>
         {started && (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
@@ -170,7 +166,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* LANDING PAGE */}
       {!started ? (
         <div style={{
           position: "relative",
@@ -223,17 +218,14 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        /* MAIN APP */
         <div style={{ position: "relative", zIndex: 2, maxWidth: 1000, margin: "0 auto", padding: "40px 24px 80px" }}>
 
-          {/* Heading */}
           <div style={{ textAlign: "center", marginBottom: 40 }}>
             <h1 style={{ fontSize: "clamp(48px,6vw,80px)", lineHeight: 0.95, letterSpacing: "-0.06em", fontWeight: 600, margin: 0, marginBottom: 16 }}>
               Ask your codebase<br />anything<span style={{ color: "#7c3aed" }}>.</span>
             </h1>
           </div>
 
-          {/* Search bar */}
           <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.05)", borderRadius: 30, padding: 16, display: "flex", alignItems: "center", gap: 16, backdropFilter: "blur(20px)", marginBottom: 16 }}>
             <div style={{ color: "#666", fontSize: 24, paddingLeft: 8 }}>⌘</div>
             <input
@@ -252,7 +244,6 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Chips */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, justifyContent: "center" }}>
             {CHIPS.map(c => (
               <button key={c} onClick={() => ask(c)}
@@ -262,7 +253,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Loading */}
           {loading && (
             <div style={{ ...block, padding: 24, textAlign: "center", marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
@@ -272,72 +262,49 @@ export default function Home() {
             </div>
           )}
 
-          {/* Results */}
           {res && !loading && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-              {/* Question bubble */}
               <div style={{ alignSelf: "flex-end", background: "#1a1530", border: "1px solid #2a2045", color: "#a78bfa", borderRadius: "10px 10px 2px 10px", padding: "9px 14px", fontSize: 13, maxWidth: "70%" }}>
                 {res.question}
               </div>
 
-              {/* Stats — CHANGE 1: top accent bar, bigger number, uppercase label */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                {[
-                  { n: githubCount, l: 'github results', c: '#34d399' },
-                  { n: incidentCount, l: 'incidents', c: '#f87171' },
-                  { n: issueCount, l: 'open issues', c: '#fbbf24' }
-                ].map(s => (
-                  <div key={s.l} style={{ background: "#0d0d14", border: "1px solid #1a1a2a", borderRadius: 10, padding: "14px 13px", textAlign: "center", position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: s.c }} />
-                    <div style={{ fontSize: 24, fontWeight: 600, fontFamily: "monospace", color: s.c, lineHeight: 1, marginBottom: 4 }}>{s.n}</div>
-                    <div style={{ fontSize: 10, color: "#2a2a3a", letterSpacing: ".05em", textTransform: "uppercase" }}>{s.l}</div>
-                  </div>
-                ))}
-              </div>
+              {/* Stats — only show when there is data */}
+              {(githubCount > 0 || incidentCount > 0 || issueCount > 0) && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+                  {[
+                    { n: githubCount, l: 'github results', c: '#34d399' },
+                    { n: incidentCount, l: 'incidents', c: '#f87171' },
+                    { n: issueCount, l: 'open issues', c: '#fbbf24' }
+                  ].map(s => (
+                    <div key={s.l} style={{ background: "#0d0d14", border: "1px solid #1a1a2a", borderRadius: 10, padding: "14px 13px", textAlign: "center", position: "relative", overflow: "hidden" }}>
+                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: s.c }} />
+                      <div style={{ fontSize: 24, fontWeight: 600, fontFamily: "monospace", color: s.c, lineHeight: 1, marginBottom: 4 }}>{s.n}</div>
+                      <div style={{ fontSize: 10, color: "#2a2a3a", letterSpacing: ".05em", textTransform: "uppercase" }}>{s.l}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              {/* Release Analytics — CHANGE 2: top accent bar added */}
-              {res && !loading && (
+              {/* Release Analytics — only show when there is data */}
+              {(res.correlated_data?.length > 0 || res.deployments?.length > 0) && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 4 }}>
                   {[
-                    {
-                      label: "merged PRs",
-                      value: res.correlated_data?.filter(r => r.merged_at)?.length || 0,
-                      color: "#a78bfa",
-                      icon: "⬆"
-                    },
-                    {
-                      label: "sources",
-                      value: res.sources_used?.length || 0,
-                      color: "#fbbf24",
-                      icon: "🔗"
-                    },
-                    {
-                      label: "deployments",
-                      value: res.deployments?.length || 0,
-                      color: "#34d399",
-                      icon: "🚀"
-                    },
-                    {
-                      label: "contributors",
-                      value: res.correlated_data?.filter(r => r.login)?.length || 0,
-                      color: "#60a0f0",
-                      icon: "👤"
-                    }
+                    { label: "merged PRs", value: res.correlated_data?.filter(r => r.merged_at)?.length || 0, color: "#a78bfa", icon: "⬆" },
+                    { label: "sources", value: res.sources_used?.length || 0, color: "#fbbf24", icon: "🔗" },
+                    { label: "deployments", value: res.deployments?.length || 0, color: "#34d399", icon: "🚀" },
+                    { label: "contributors", value: res.correlated_data?.filter(r => r.login)?.length || 0, color: "#60a0f0", icon: "👤" }
                   ].map(s => (
                     <div key={s.label} style={{ background: "#0d0d14", border: "1px solid #1a1a2a", borderRadius: 10, padding: "12px 13px", textAlign: "center", position: "relative", overflow: "hidden" }}>
                       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: s.color }} />
                       <div style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</div>
-                      <div style={{ fontSize: 20, fontWeight: 500, fontFamily: "monospace", color: s.color }}>
-                        {s.value}
-                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 500, fontFamily: "monospace", color: s.color }}>{s.value}</div>
                       <div style={{ fontSize: 11, color: "#2a2a3a", marginTop: 2 }}>{s.label}</div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Sources */}
               {res.sources_used?.length > 0 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {res.sources_used.map(s => (
@@ -348,7 +315,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* AI Summary — CHANGE 3: gradient background + purple border */}
               {(res.summary || prExplain) && (
                 <div style={{ background: "linear-gradient(135deg,rgba(124,58,237,.08),rgba(67,56,202,.04))", border: "1px solid rgba(124,58,237,.2)", borderRadius: 12, overflow: "hidden" }}>
                   <div style={{ ...bhead("#a78bfa"), justifyContent: "space-between", borderBottom: "1px solid rgba(124,58,237,.12)" }}>
@@ -361,14 +327,11 @@ export default function Home() {
                     )}
                   </div>
                   <p style={{ padding: "12px 14px", fontSize: 13, color: "#9090c0", lineHeight: 1.85, margin: 0 }}>
-                    {prExplain
-                      ? (prLoading ? "Analyzing PR..." : prExplain.explanation)
-                      : res.summary}
+                    {prExplain ? (prLoading ? "Analyzing PR..." : prExplain.explanation) : res.summary}
                   </p>
                 </div>
               )}
 
-              {/* Incidents — CHANGE 4: red left border */}
               {res.incidents?.length > 0 && (
                 <div style={{ ...block, borderLeft: "2px solid #f87171" }}>
                   <div style={bhead("#f87171")}><span style={dot("#f87171")} />INCIDENTS</div>
@@ -393,7 +356,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Deployments — CHANGE 4: green left border */}
               {res.deployments?.length > 0 && (
                 <div style={{ ...block, borderLeft: "2px solid #34d399" }}>
                   <div style={bhead("#34d399")}><span style={dot("#34d399")} />DEPLOYMENTS</div>
@@ -418,7 +380,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Contributor Leaderboard — CHANGE 4: blue left border */}
               {res.correlated_data?.length > 0 && res.correlated_data[0]?.login && (
                 <div style={{ ...block, borderLeft: "2px solid #60a0f0" }}>
                   <div style={bhead("#60a0f0")}><span style={dot("#60a0f0")} />TOP CONTRIBUTORS</div>
@@ -454,7 +415,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* GitHub Data — CHANGE 4: green left border */}
               {res.correlated_data?.length > 0 && !res.correlated_data[0]?.login && (
                 <div style={{ ...block, borderLeft: "2px solid #34d399" }}>
                   <div style={bhead("#34d399")}><span style={dot("#34d399")} />GITHUB DATA</div>
@@ -475,7 +435,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Supporting Data — CHANGE 4: amber left border */}
               {res.open_issues?.length > 0 && (
                 <div style={{ ...block, borderLeft: "2px solid #fbbf24" }}>
                   <div style={bhead("#fbbf24")}><span style={dot("#fbbf24")} />SUPPORTING DATA</div>
@@ -489,7 +448,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Empty state */}
               {res.correlated_data?.length === 0 && res.open_issues?.length === 0 && (
                 <div style={{ ...block, padding: 24, textAlign: "center" }}>
                   <div style={{ color: "#3a3a5a", fontFamily: "monospace", fontSize: 12 }}>
@@ -498,7 +456,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* SQL Queries — CHANGE 4: blue left border */}
               {res.sql_queries?.length > 0 && (
                 <details style={{ ...block, borderLeft: "2px solid #4a90d9" }}>
                   <summary style={{ ...bhead("#60a0f0"), cursor: "pointer", listStyle: "none" }}>
