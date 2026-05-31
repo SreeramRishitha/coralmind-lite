@@ -459,7 +459,7 @@ export default function Home() {
                 </div>
               )}
 
-              {res.sql_queries?.length > 0 && (
+              {res.sql_queries?.length > 0 && res.sql_queries.some(q => q.trim()) && (
                 <details style={{ ...block, borderLeft: "2px solid #4a90d9" }}>
                   <summary style={{ ...bhead("#60a0f0"), cursor: "pointer", listStyle: "none" }}>
                     <span style={dot("#60a0f0")} />SQL QUERIES (click to expand)
