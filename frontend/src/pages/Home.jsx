@@ -441,8 +441,8 @@ export default function Home() {
               {res.open_issues?.length > 0 && (
                 <div style={{ ...block, borderLeft: "2px solid #fbbf24" }}>
                   <div style={bhead("#fbbf24")}><span style={dot("#fbbf24")} />SUPPORTING DATA</div>
-                  {res.open_issues.map((row, i) => (
-                    <div key={i} style={{ ...brow, borderBottom: i === res.open_issues.length - 1 ? "none" : "1px solid #16161f" }}>
+                  {res.open_issues.filter(row => row.number && row.title).map((row, i, arr) => (
+                    <div key={i} style={{ ...brow, borderBottom: i === arr.length - 1 ? "none" : "1px solid #16161f" }}>
                       <span style={dot("#fbbf24")} />
                       <span style={{ fontFamily: "monospace", fontSize: 11, minWidth: 34, color: "#fbbf24" }}>#{row.number}</span>
                       <span style={{ flex: 1, color: "#7070a0" }}>{row.title}</span>
