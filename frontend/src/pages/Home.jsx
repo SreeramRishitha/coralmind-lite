@@ -410,7 +410,7 @@ export default function Home() {
                           width: Math.max(20, (row.contributions / res.correlated_data[0].contributions) * 80)
                         }} />
                         <span style={{ color: "#3a3a5a", fontSize: 11, minWidth: 60, textAlign: "right" }}>
-                          {row.contributions} commits
+                          {row.contributions || "—"} commits
                         </span>
                       </div>
                     </div>
