@@ -155,32 +155,48 @@ def answer_non_technical(question: str) -> str:
 def generate_sql_from_question(question: str, owner: str, repo: str):
     q = question.lower()
 
-    # Hardcoded reliable routes
+    # "prs by username" — hardcoded, fetch 100 then filter in Python
+    if "prs by " in q or "pulls by " in q or "raised by " in q:
+        for keyword in ["prs by ", "pulls by ", "raised by "]:
+            if keyword in q:
+                username = q.split(keyword)[-1].strip().strip("@").strip()
+                break
+        return [
+            f"SELECT number, title, state, user__login, created_at, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 100",
+            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5",
+            username
+        ]
+
     if any(w in q for w in ["merged pr", "merged prs", "merged pull", "show merged"]):
         return [
             f"SELECT number, title, state, merged_at, user__login FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 10",
             f"SELECT number, title, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 5"
         ]
+
     if any(w in q for w in ["open issue", "open issues", "bugs open", "any bugs"]):
         return [
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
+
     if any(w in q for w in ["contributor", "contributors", "top contributor"]):
         return [
             f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
             f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 5"
         ]
+
     if any(w in q for w in ["working on", "in progress", "active", "what is being"]):
         return [
             f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
             f"SELECT number, title, state, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
+
     if any(w in q for w in ["incident", "outage", "sentry", "production", "alert"]):
         return [
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
             f"SELECT id, title, status, level FROM sentry.issues LIMIT 5"
         ]
+
     if any(w in q for w in ["commit", "commits", "how many commits"]):
         return [
             f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
@@ -201,11 +217,8 @@ Available tables:
 Rules:
 - Always include WHERE owner='{owner}' AND repo='{repo}' for github tables
 - Use LIMIT 10 on first query, LIMIT 5 on second
-- For commits/commit count questions: use github.repo_contributors and sum contributions
-- For PR questions: use github.pulls
-- For issue questions: use github.issues
-- For contributor questions: use github.repo_contributors
-- For incident questions: use sentry.issues (no owner/repo filter needed)
+- Never use SELECT * — always specify columns explicitly
+- Only use these columns: number, title, state, created_at, merged_at, user__login, login, contributions, id, level, status
 - Return ONLY a JSON object like: {{"query1": "SELECT ...", "query2": "SELECT ..."}}
 - No explanation, no markdown, just the JSON"""
 
@@ -222,18 +235,23 @@ Rules:
         return [parsed.get("query1", ""), parsed.get("query2", "")]
     except Exception as e:
         return [
-            f"SELECT i.number, i.title, i.state, p.created_at FROM github.issues i JOIN github.pulls p ON i.number = p.number WHERE i.owner = '{owner}' AND i.repo = '{repo}' AND p.owner = '{owner}' AND p.repo = '{repo}' LIMIT 10",
-            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
+            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
+            f"SELECT number, title, state FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
 
 def generate_summary(question: str, github_data: list, supporting_data: list, incidents: list):
+    # Truncate data to prevent token overflow
+    github_str = str(github_data[:10])[:2000]
+    supporting_str = str(supporting_data[:5])[:800]
+    incidents_str = str(incidents[:5])[:800]
+
     context = f"""You are an engineering intelligence assistant analyzing GitHub activity and operational incidents.
 
 Answer this question directly: {question}
 
-Primary data: {github_data}
-Supporting data: {supporting_data}
-Incident data: {incidents}
+Primary data: {github_str}
+Supporting data: {supporting_str}
+Incident data: {incidents_str}
 
 Rules:
 - Be concise and specific, 2-3 sentences max
@@ -302,10 +320,10 @@ async def explain_pr(data: PRRequest):
                 author = parts[4] if len(parts) > 4 else ""
                 break
     if not title:
-        body_text = raw
+        body_text = raw[:2000]
         title = f"PR #{data.number}"
     else:
-        body_text = body
+        body_text = body[:2000]
     context = f"""Explain this GitHub pull request clearly for an engineer.
 
 Title: {title}
@@ -329,7 +347,6 @@ Give a 3-4 sentence explanation: what problem it solves, what changed, and why i
 async def ask(data: QuestionRequest):
     q = data.question.lower()
 
-    # Handle non-technical questions
     if not is_technical_question(data.question):
         return {
             "question": data.question,
@@ -349,17 +366,16 @@ async def ask(data: QuestionRequest):
     raw1 = run_coral(queries[0])
     raw2 = run_coral(queries[1])
 
-    data1 = parse_coral_output(raw1)
-    data1 = data1[:15]  # limit to prevent token overflow
+    data1 = parse_coral_output(raw1)[:10]
+
     if len(queries) > 2 and queries[2]:
         username = queries[2]
         data1 = [r for r in data1 if r.get("user__login", "").lower() == username.lower()]
-    data2 = parse_coral_output(raw2)
-    data2 = data2[:10]  # limit to prevent token overflow
+
+    data2 = parse_coral_output(raw2)[:5]
+
     merged_prs = [r for r in data1 if r.get("merged_at")]
     deployments = generate_deployments_from_prs(merged_prs)
-
-    dynamic = generate_dynamic_incidents(data1)
 
     if any(w in q for w in ["incident", "outage", "down", "service", "alert", "severity", "sentry", "production"]):
         static = get_all_incidents()
