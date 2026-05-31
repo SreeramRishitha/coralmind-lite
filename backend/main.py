@@ -162,7 +162,7 @@ def generate_sql_from_question(question: str, owner: str, repo: str):
                 username = q.split(keyword)[-1].strip().strip("@").strip()
                 break
         return [
-            f"SELECT number, title, state, user__login, created_at, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 100",
+            f"SELECT number, title, state, user__login, created_at, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 1000",
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5",
             username
         ]
