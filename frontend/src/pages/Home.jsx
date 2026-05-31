@@ -140,11 +140,14 @@ export default function Home() {
         alignItems: "center"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img
-            src="https://res.cloudinary.com/dnrnhtkyq/image/upload/v1780174379/WhatsApp_Image_2026-05-31_at_2.15.45_AM_van54k.jpg"
-            alt="CoralMind"
-            style={{ height: 36, width: 36, borderRadius: 8, objectFit: "contain" }}
-          />
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, boxShadow: "0 0 20px rgba(124,58,237,0.4)"
+          }}>
+            ◈
+          </div>
           <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.04em" }}>CoralMind</span>
         </div>
         {started && (
