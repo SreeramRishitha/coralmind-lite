@@ -153,6 +153,41 @@ def answer_non_technical(question: str) -> str:
         return "Hi! I'm CoralMind, your AI engineering assistant. Ask me about your repository — try 'show incidents', 'who are the top contributors', or 'explain #990'."
 
 def generate_sql_from_question(question: str, owner: str, repo: str):
+    q = question.lower()
+
+    # Hardcoded reliable routes
+    if any(w in q for w in ["merged pr", "merged prs", "merged pull", "show merged"]):
+        return [
+            f"SELECT number, title, state, merged_at, user__login FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 10",
+            f"SELECT number, title, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 5"
+        ]
+    if any(w in q for w in ["open issue", "open issues", "bugs open", "any bugs"]):
+        return [
+            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
+            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
+        ]
+    if any(w in q for w in ["contributor", "contributors", "top contributor"]):
+        return [
+            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
+            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 5"
+        ]
+    if any(w in q for w in ["working on", "in progress", "active", "what is being"]):
+        return [
+            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
+            f"SELECT number, title, state, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
+        ]
+    if any(w in q for w in ["incident", "outage", "sentry", "production", "alert"]):
+        return [
+            f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
+            f"SELECT id, title, status, level FROM sentry.issues LIMIT 5"
+        ]
+    if any(w in q for w in ["commit", "commits", "how many commits"]):
+        return [
+            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
+            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 5"
+        ]
+
+    # AI-generated SQL for everything else
     prompt = f"""You are a SQL expert for Coral, a SQL runtime that queries GitHub and other sources.
 
 Generate exactly 2 SQL queries to answer this question: "{question}"
@@ -220,6 +255,10 @@ Rules:
 @app.get("/")
 def home():
     return {"status": "CoralMind Lite is running"}
+
+@app.get("/ping")
+def ping():
+    return {"status": "alive"}
 
 @app.get("/debug-coral")
 def debug_coral():
@@ -311,11 +350,12 @@ async def ask(data: QuestionRequest):
     raw2 = run_coral(queries[1])
 
     data1 = parse_coral_output(raw1)
+    data1 = data1[:15]  # limit to prevent token overflow
     if len(queries) > 2 and queries[2]:
         username = queries[2]
         data1 = [r for r in data1 if r.get("user__login", "").lower() == username.lower()]
     data2 = parse_coral_output(raw2)
-
+    data2 = data2[:10]  # limit to prevent token overflow
     merged_prs = [r for r in data1 if r.get("merged_at")]
     deployments = generate_deployments_from_prs(merged_prs)
 
