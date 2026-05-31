@@ -438,7 +438,7 @@ export default function Home() {
                 </div>
               )}
 
-              {res.open_issues?.length > 0 && (
+              {false && res.open_issues?.length > 0 && (
                 <div style={{ ...block, borderLeft: "2px solid #fbbf24" }}>
                   <div style={bhead("#fbbf24")}><span style={dot("#fbbf24")} />SUPPORTING DATA</div>
                   {res.open_issues.filter(row => row.number && row.title).map((row, i, arr) => (
