@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from incidents import init_db, get_all_incidents, get_incidents_by_status, get_incidents_for_issues
 import sentry_sdk
 from deployments import generate_deployments_from_prs
+import redis as redis_client
 load_dotenv()
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
@@ -30,7 +31,11 @@ app.add_middleware(
 CORAL_PATH = os.getenv("CORAL_PATH", "/app/coral")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-cache = {}
+REDIS_URL = os.getenv("REDIS_URL")
+try:
+    cache = redis_client.from_url(REDIS_URL) if REDIS_URL else None
+except:
+    cache = None
 CACHE_TTL = 300
 
 INCIDENT_KEYWORDS = ["bug", "fail", "failure", "error", "timeout", "crash", "broken", "fix", "regression", "flake"]
@@ -46,11 +51,14 @@ class PRRequest(BaseModel):
     repo: str = "coral"
 
 def run_coral(query: str):
-    now = time.time()
-    if query in cache:
-        result, timestamp = cache[query]
-        if now - timestamp < CACHE_TTL:
-            return result
+    if cache:
+        try:
+            cached = cache.get(query)
+            if cached:
+                return cached.decode("utf-8")
+        except:
+            pass
+
     try:
         result = subprocess.run(
             [CORAL_PATH, "sql", query],
@@ -61,7 +69,13 @@ def run_coral(query: str):
         output = result.stdout if result.returncode == 0 else f"Error: {result.stderr}"
     except subprocess.TimeoutExpired:
         output = "Error: Query timed out. Try again."
-    cache[query] = (output, now)
+
+    if cache:
+        try:
+            cache.set(query, output, ex=CACHE_TTL)
+        except:
+            pass
+
     return output
 
 def parse_coral_output(raw: str):

@@ -7,3 +7,4 @@ pydantic
 sentry-sdk
 httpx
 psycopg2-binary
+redis
