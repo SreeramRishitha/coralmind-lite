@@ -165,11 +165,11 @@ def answer_non_technical(question: str) -> str:
         return response.choices[0].message.content
     except:
         return "Hi! I'm CoralMind, your AI engineering assistant. Ask me about your repository — try 'show incidents', 'who are the top contributors', or 'explain #990'."
-
 def generate_sql_from_question(question: str, owner: str, repo: str):
+    from semantic_router import get_route
     q = question.lower()
 
-    # "prs by username" — hardcoded, fetch 100 then filter in Python
+    # "prs by username" — must stay first
     if "prs by " in q or "pulls by " in q or "raised by " in q:
         for keyword in ["prs by ", "pulls by ", "raised by "]:
             if keyword in q:
@@ -181,40 +181,33 @@ def generate_sql_from_question(question: str, owner: str, repo: str):
             username
         ]
 
-    if any(w in q for w in ["merged pr", "merged prs", "merged pull", "show merged"]):
+    # Semantic routing
+    route = get_route(question)
+
+    if route == "contributors":
+        return [
+            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
+            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 5"
+        ]
+    elif route == "merged_prs":
         return [
             f"SELECT number, title, state, merged_at, user__login FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 10",
             f"SELECT number, title, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'closed' LIMIT 5"
         ]
-
-    if any(w in q for w in ["open issue", "open issues", "bugs open", "any bugs"]):
+    elif route == "open_issues":
         return [
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
-
-    if any(w in q for w in ["contributor", "contributors", "top contributor"]):
-        return [
-            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
-            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 5"
-        ]
-
-    if any(w in q for w in ["working on", "in progress", "active", "what is being"]):
-        return [
-            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
-            f"SELECT number, title, state, merged_at FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
-        ]
-
-    if any(w in q for w in ["incident", "outage", "sentry", "production", "alert"]):
+    elif route == "incidents":
         return [
             f"SELECT number, title, state FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
             f"SELECT id, title, status, level FROM sentry.issues LIMIT 5"
         ]
-
-    if any(w in q for w in ["commit", "commits", "how many commits"]):
+    elif route == "active_work":
         return [
-            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 10",
-            f"SELECT login, contributions FROM github.repo_contributors WHERE owner = '{owner}' AND repo = '{repo}' LIMIT 5"
+            f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
+            f"SELECT number, title, state FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
 
     # AI-generated SQL for everything else
@@ -252,7 +245,6 @@ Rules:
             f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
             f"SELECT number, title, state FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
-
 def generate_summary(question: str, github_data: list, supporting_data: list, incidents: list):
     # Truncate data to prevent token overflow
     github_str = str(github_data[:10])[:2000]
