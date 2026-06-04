@@ -245,11 +245,12 @@ Rules:
             f"SELECT number, title, state, created_at FROM github.issues WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 10",
             f"SELECT number, title, state FROM github.pulls WHERE owner = '{owner}' AND repo = '{repo}' AND state = 'open' LIMIT 5"
         ]
-def generate_summary(question: str, github_data: list, supporting_data: list, incidents: list):
-    # Truncate data to prevent token overflow
+    
+def generate_summary(question: str, github_data: list, supporting_data: list, incidents: list, similar_issues: list = []):
     github_str = str(github_data[:10])[:2000]
     supporting_str = str(supporting_data[:5])[:800]
     incidents_str = str(incidents[:5])[:800]
+    similar_str = str(similar_issues[:3])[:500]
 
     context = f"""You are an engineering intelligence assistant analyzing GitHub activity and operational incidents.
 
@@ -258,12 +259,12 @@ Answer this question directly: {question}
 Primary data: {github_str}
 Supporting data: {supporting_str}
 Incident data: {incidents_str}
+Semantically similar issues: {similar_str}
 
 Rules:
 - Be concise and specific, 2-3 sentences max
 - Mention actual names, issue numbers, PR titles, and incident IDs when present
-- Never say "the data does not provide" — summarize the closest relevant findings instead
-- If asked about commits, use the contributions column from repo_contributors as the commit count
+- Use similar issues to provide better context
 - Write like an internal engineering insights tool, not a chatbot"""
     try:
         client = Groq(api_key=GROQ_API_KEY)
@@ -379,6 +380,15 @@ async def ask(data: QuestionRequest):
         data1 = [r for r in data1 if r.get("user__login", "").lower() == username.lower()]
 
     data2 = parse_coral_output(raw2)[:5]
+    # Search vector DB for semantically similar issues
+    try:
+        from vector_store import index_issues, search_issues
+        index_issues(data1, data.owner, data.repo)
+        similar_issues = search_issues(data.question, data.owner, data.repo, n_results=3)
+        print(f"Similar issues found: {similar_issues}")
+    except Exception as e:
+        print(f"Vector store error: {e}")
+        similar_issues = []         
 
     merged_prs = [r for r in data1 if r.get("merged_at")]
     deployments = generate_deployments_from_prs(merged_prs)
@@ -394,7 +404,7 @@ async def ask(data: QuestionRequest):
         dynamic = generate_dynamic_incidents(data1)
         incidents = (static + dynamic)[:5]
 
-    summary = generate_summary(data.question, data1, data2, incidents)
+    summary = generate_summary(data.question, data1, data2, incidents, similar_issues)
 
     active_sources = []
     if data1 or data2:
@@ -415,4 +425,5 @@ async def ask(data: QuestionRequest):
         "open_issues": data2,
         "incidents": incidents,
         "deployments": deployments,
+        "similar_issues": similar_issues,
     }

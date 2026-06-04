@@ -8,3 +8,5 @@ sentry-sdk
 httpx
 psycopg2-binary
 redis
+chromadb
+sentence-transformers
