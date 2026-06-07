@@ -307,15 +307,23 @@ def debug_coral():
 def debug_pulls():
     raw = run_coral("SELECT * FROM github.pulls WHERE owner = 'sugarlabs' AND repo = 'musicblocks' LIMIT 1")
     return {"raw": raw}
+
 @app.get("/debug-embeddings")
 def debug_embeddings():
     try:
-        from vector_store import get_embeddings
-        result = get_embeddings(["test connection issue"])
-        return {"status": "ok", "type": str(type(result)), "length": len(result) if result else 0, "sample": str(result)[:200] if result else None}
+        import httpx
+        HF_TOKEN = os.getenv("HF_TOKEN")
+        API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+        response = httpx.post(API_URL, headers=headers, json={"inputs": ["test"]}, timeout=30)
+        return {
+            "status_code": response.status_code,
+            "response": response.json(),
+            "hf_token_set": bool(HF_TOKEN)
+        }
     except Exception as e:
         return {"status": "error", "error": str(e)}
-
+    
 @app.post("/explain-pr")
 async def explain_pr(data: PRRequest):
     query = f"SELECT number, title, body, state, user__login FROM github.pulls WHERE owner = '{data.owner}' AND repo = '{data.repo}' AND number = {data.number} LIMIT 1"

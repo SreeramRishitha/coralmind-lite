@@ -18,10 +18,15 @@ def get_embeddings(texts: list):
         headers["Authorization"] = f"Bearer {HF_TOKEN}"
     try:
         response = httpx.post(API_URL, headers=headers, json={"inputs": texts}, timeout=30)
-        return response.json()
-    except:
+        result = response.json()
+        # Check if HF returned an error
+        if isinstance(result, dict) and "error" in result:
+            print(f"HF API error: {result}")
+            return None
+        return result
+    except Exception as e:
+        print(f"HF API exception: {e}")
         return None
-
 def index_issues(issues: list, owner: str, repo: str):
     if not issues:
         return
