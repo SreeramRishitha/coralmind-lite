@@ -307,6 +307,21 @@ def debug_coral():
 def debug_pulls():
     raw = run_coral("SELECT * FROM github.pulls WHERE owner = 'sugarlabs' AND repo = 'musicblocks' LIMIT 1")
     return {"raw": raw}
+@app.get("/debug-network")
+def debug_network():
+    results = {}
+    urls = [
+        "https://api.groq.com",
+        "https://api-inference.huggingface.co",
+        "https://api.openai.com",
+    ]
+    for url in urls:
+        try:
+            r = httpx.get(url, timeout=5)
+            results[url] = f"reachable ({r.status_code})"
+        except Exception as e:
+            results[url] = f"blocked: {str(e)[:50]}"
+    return results
 
 @app.get("/debug-embeddings")
 def debug_embeddings():
