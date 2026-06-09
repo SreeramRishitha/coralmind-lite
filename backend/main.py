@@ -6,6 +6,7 @@ import time
 import json
 from groq import Groq
 import os
+import httpx
 from dotenv import load_dotenv
 from incidents import init_db, get_all_incidents, get_incidents_by_status, get_incidents_for_issues
 import sentry_sdk
