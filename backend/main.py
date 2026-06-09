@@ -412,16 +412,20 @@ async def ask(data: QuestionRequest):
         data1 = [r for r in data1 if r.get("user__login", "").lower() == username.lower()]
 
     data2 = parse_coral_output(raw2)[:5]
-    # Search vector DB for semantically similar issues
+    similar_issues = []
     try:
-        from vector_store import index_issues, search_issues
-        index_issues(data1, data.owner, data.repo)
-        similar_issues = search_issues(data.question, data.owner, data.repo, n_results=3)
-        print(f"Similar issues found: {similar_issues}")
-    except Exception as e:
-        print(f"Vector store error: {e}")
-        similar_issues = []         
-
+        if data1:
+            titles = [f"#{r.get('number')} {r.get('title','')}" for r in data1[:10]]
+            client_groq = Groq(api_key=GROQ_API_KEY)
+            sim_response = client_groq.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": f"Given the question: \"{data.question}\"\n\nFrom these issues:\n" + "\n".join(titles) + "\n\nReturn the 3 most semantically relevant ones as a JSON array like: [{{\"number\": \"123\", \"title\": \"...\"}}]. Return ONLY the JSON array, no explanation."}],
+                max_tokens=200
+            )
+            text = sim_response.choices[0].message.content.strip().replace("```json","").replace("```","").strip()
+            similar_issues = json.loads(text)
+    except:
+        similar_issues = []
     merged_prs = [r for r in data1 if r.get("merged_at")]
     deployments = generate_deployments_from_prs(merged_prs)
 
