@@ -1,9 +1,8 @@
 import chromadb
-import httpx
 import os
+from groq import Groq
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 client = chromadb.Client()
 try:
@@ -13,20 +12,20 @@ except:
 collection = client.create_collection("github_issues")
 
 def get_embeddings(texts: list):
-    headers = {}
-    if HF_TOKEN:
-        headers["Authorization"] = f"Bearer {HF_TOKEN}"
     try:
-        response = httpx.post(API_URL, headers=headers, json={"inputs": texts}, timeout=30)
-        result = response.json()
-        # Check if HF returned an error
-        if isinstance(result, dict) and "error" in result:
-            print(f"HF API error: {result}")
-            return None
-        return result
+        groq_client = Groq(api_key=GROQ_API_KEY)
+        embeddings = []
+        for text in texts:
+            response = groq_client.embeddings.create(
+                model="nomic-embed-text-v1_5",
+                input=text
+            )
+            embeddings.append(response.data[0].embedding)
+        return embeddings
     except Exception as e:
-        print(f"HF API exception: {e}")
+        print(f"Groq embedding error: {e}")
         return None
+
 def index_issues(issues: list, owner: str, repo: str):
     if not issues:
         return
@@ -59,11 +58,15 @@ def search_issues(query: str, owner: str, repo: str, n_results: int = 5):
         query_embedding = get_embeddings([query])
         if query_embedding is None:
             return []
-        results = collection.query(query_embeddings=[query_embedding], n_results=n_results)
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=n_results
+        )
         matches = []
         for doc, meta, distance in zip(results["documents"][0], results["metadatas"][0], results["distances"][0]):
             if meta.get("owner") == owner and meta.get("repo") == repo:
                 matches.append({"number": meta["number"], "title": doc, "state": meta["state"], "similarity": round(1 - distance, 3)})
         return matches
     except Exception as e:
+        print(f"Search error: {e}")
         return []
